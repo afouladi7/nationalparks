@@ -16,24 +16,22 @@ spec:
       kind: PipelineRun
       metadata:
         labels:
-          tekton.dev/pipeline: nationalparks-pipeline
+          tekton.dev/pipeline: nationalparks
         name: nationalparks-deploy-$(uid)
       spec:
         params:
           - name: APP_NAME
-            value: $(params.git-repo-name)
-          - name: APP_GIT_URL
-            value: $(params.git-repo-url)
-          - name: APP_GIT_REVISION
-            value: $(params.git-revision)
+            value: nationalparks
+          - name: GIT_REPO
+            value: $(tt.params.git-repo-url)
+          - name: GIT_REVISION
+            value: $(tt.params.git-revision)
         pipelineRef:
-          name: nationalparks-pipeline
+          name: nationalparks
         workspaces:
-        - name: app-source
+        - name: workspace
           persistentVolumeClaim:
             claimName: app-source-pvc
-        - name: maven-settings
-          emptyDir: {}
 ---
 apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerBinding
@@ -56,7 +54,7 @@ spec:
   serviceAccountName: pipeline
   triggers:
   - bindings:
-    - name: nationalparks
+    - ref: nationalparks
     template:
       name: nationalparks
 ---

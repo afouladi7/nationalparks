@@ -2,27 +2,26 @@
   "kind": "Template",
   "apiVersion": "v1",
   "metadata": {
-    "name": "nationalparks",
+    "name": "nationalparks-py",
     "annotations": {
       "iconClass": "icon-java",
-      "description": "Application template NationalParks backend running on SpringBoot and using mongodb",
-      "tags": "roadshow,springboot,roadshow-backend,java,mongodb"
+      "description": "Application template National Parks backend running on Python/Flask and using mongodb"
     }
   },
   "labels": {
-    "application": "nationalparks",
-    "createdBy": "nationalparks-template"
+    "application": "nationalparks-py",
+    "createdBy": "nationalparks-py-template"
   },
   "parameters": [
     {
-      "description": "The name for the nationalparks application.",
+      "description": "The name for the nationalparks-py application.",
       "displayName": "Application Name",
       "name": "APPLICATION_NAME",
-      "value": "nationalparks",
+      "value": "nationalparks-py",
       "required": true
     },
     {
-      "description": "Custom hostname for nationalparks application.  Leave blank for default hostname, e.g.: <application-name>.<project>.<default-domain-suffix>",
+      "description": "Custom hostname for nationalparks-py application.  Leave blank for default hostname, e.g.: <application-name>.<project>.<default-domain-suffix>",
       "displayName": "Application route",
       "name": "APPLICATION_HOSTNAME"
     },
@@ -37,7 +36,7 @@
       "description": "Git source URI for application",
       "displayName": "Git source repository",
       "name": "GIT_URI",
-      "value": "https://github.com/openshift-roadshow/nationalparks.git",
+      "value": "https://github.com/openshift-roadshow/nationalparks-py.git",
       "required": true
     },
     {
@@ -46,12 +45,6 @@
       "name": "GIT_REF",
       "value": "master",
       "required": true
-    },
-    {
-      "description": "Maven mirror url. If nexus is deployed locally, use nexus url (e.g. http://nexus.ci:8081/content/groups/public/)",
-      "displayName": "Maven mirror url",
-      "name": "MAVEN_MIRROR_URL",
-      "required": false
     },
     {
       "description": "Database name",
@@ -76,21 +69,24 @@
       "description": "Database user name",
       "displayName": "Database user name",
       "name": "MONGODB_USER",
-      "value": "mongodb",
+      "from": "user[a-zA-Z0-9]{3}",
+      "generate": "expression",
       "required": true
     },
     {
       "description": "Database user password",
       "displayName": "Database user password",
       "name": "MONGODB_PASSWORD",
-      "value": "mongodb",
+      "from": "[a-zA-Z0-9]{8}",
+      "generate": "expression",
       "required": true
     },
     {
       "description": "Database admin password",
       "displayName": "Database admin password",
       "name": "MONGODB_ADMIN_PASSWORD",
-      "value": "mongodb",
+      "from": "[a-zA-Z0-9]{8}",
+      "generate": "expression",
       "required": true
     },
     {
@@ -112,21 +108,20 @@
   ],
   "objects": [
     {
-      "kind": "ImageStream",
+      "kind": "ConfigMap",
       "apiVersion": "v1",
       "metadata": {
-        "name": "s2i-java"
+        "name": "${APPLICATION_NAME}",
+        "labels": {
+          "component": "config"
+        }
       },
-      "spec": {
-        "tags": [
-          {
-            "name": "latest",
-            "from": {
-              "kind": "DockerImage",
-              "name": "jorgemoralespou/s2i-java"
-            }
-          }
-        ]
+      "data": {
+        "db.user": "${MONGODB_USER}",
+        "db.password": "${MONGODB_PASSWORD}",
+        "db.name": "${MONGODB_DATABASE}",
+        "db.properties": "db.user=${MONGODB_USER}\ndb.password=${MONGODB_PASSWORD}\ndb.name=${MONGODB_DATABASE}",
+        "application.properties": "spring.data.mongodb.uri=mongodb://${MONGODB_USER}:${MONGODB_PASSWORD}@${MONGODB_APPLICATION_NAME}:27017/${MONGODB_DATABASE}"
       }
     },
     {
@@ -229,15 +224,30 @@
                   },
                   {
                     "name": "MONGODB_USER",
-                    "value":"${MONGODB_USER}"
+                    "valueFrom": {
+                      "configMapKeyRef": {
+                        "name": "${APPLICATION_NAME}",
+                        "key": "db.user"
+                      }
+                    }
                   },
                   {
                     "name": "MONGODB_PASSWORD",
-                    "value":"${MONGODB_PASSWORD}"
+                    "valueFrom": {
+                      "configMapKeyRef": {
+                        "name": "${APPLICATION_NAME}",
+                        "key": "db.password"
+                      }
+                    }
                   },
                   {
                     "name": "MONGODB_DATABASE",
-                    "value":"${MONGODB_DATABASE}"
+                    "valueFrom": {
+                      "configMapKeyRef": {
+                        "name": "${APPLICATION_NAME}",
+                        "key": "db.name"
+                      }
+                    }
                   },
                   {
                     "name": "MONGODB_ADMIN_PASSWORD",
@@ -353,18 +363,9 @@
           "sourceStrategy": {
             "from": {
               "kind": "ImageStreamTag",
-              "name": "s2i-java:latest"
+              "namespace": "openshift",
+              "name": "python:2.7"
             },
-            "env": [
-              {
-                "name": "MAVEN_ARGS",
-                "value": "clean install spring-boot:repackage -DskipTests -Dcom.redhat.xpaas.repo.redhatga"
-              },
-              {
-                "name": "MAVEN_MIRROR_URL",
-                "value": "${MAVEN_MIRROR_URL}"
-              }
-            ],
             "incremental": false
           }
         },
@@ -460,20 +461,35 @@
                     }
                   },
                   {
-                    "name": "MONGODB_USERNAME",
-                    "value": "${MONGODB_USER}"
-                  },
-                  {
-                    "name": "MONGODB_PASSWORD",
-                    "value": "${MONGODB_PASSWORD}"
-                  },
-                  {
-                    "name": "MONGODB_DATABASE",
-                    "value": "${MONGODB_DATABASE}"
-                  },
-                  {
-                    "name": "MONGODB_SERVER_HOST",
+                    "name": "DB_HOST",
                     "value": "${MONGODB_APPLICATION_NAME}"
+                  },
+                  {
+                    "name": "DB_USERNAME",
+                    "valueFrom": {
+                      "configMapKeyRef": {
+                        "name": "${APPLICATION_NAME}",
+                        "key": "db.user"
+                      }
+                    }
+                  },
+                  {
+                    "name": "DB_PASSWORD",
+                    "valueFrom": {
+                      "configMapKeyRef": {
+                        "name": "${APPLICATION_NAME}",
+                        "key": "db.password"
+                      }
+                    }
+                  },
+                  {
+                    "name": "DB_NAME",
+                    "valueFrom": {
+                      "configMapKeyRef": {
+                        "name": "${APPLICATION_NAME}",
+                        "key": "db.name"
+                      }
+                    }
                   }
                 ],
                 "resources": {},
@@ -548,8 +564,7 @@
       "metadata": {
         "name": "${APPLICATION_NAME}",
         "labels": {
-          "component": "${APPLICATION_NAME}",
-          "type": "parksmap-backend"
+          "component": "${APPLICATION_NAME}"
         }
       },
       "spec": {
